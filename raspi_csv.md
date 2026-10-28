@@ -127,6 +127,39 @@ cat rfid_log.csv
 
 ```bash
 nano csv_append.py
+```
+
+```python
+import csv
+import os
+from datetime import datetime
+
+filename = 'rfid_log.csv'
+fieldnames = ['日時', 'UID', '名前', '結果']
+
+def log_to_csv(uid_str, name, result):
+    file_exists = os.path.exists(filename)
+
+    with open(filename, 'a', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+
+        if not file_exists:
+            writer.writeheader()  # 初回のみヘッダーを書く
+
+        writer.writerow({
+            '日時': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'UID': uid_str,
+            '名前': name,
+            '結果': result
+        })
+
+# テスト
+log_to_csv('123-45-67-89-0', 'Alice', 'ALLOWED')
+log_to_csv('99-88-77-66-0', '未登録', 'DENIED')
+print("書き込み完了")
+```
+
+```bash
 python3 csv_append.py
 python3 csv_append.py  # 2回実行して追記されるか確認
 cat rfid_log.csv
@@ -270,6 +303,74 @@ df.to_csv(filename, index=False)
 
 ```bash
 nano rfid_with_csv.py
+```
+
+```python
+import os
+import csv
+from datetime import datetime
+from mfrc522 import MFRC522
+from RPLCD.i2c import CharLCD
+import time
+
+REGISTERED = {
+    "123-45-67-89-0": "Alice",   # ← 実際のUIDに書き換える
+    "98-76-54-32-1":  "Bob",     # ← 実際のUIDに書き換える
+}
+
+CSV_FILE = 'rfid_log.csv'
+FIELDNAMES = ['日時', 'UID', '名前', '結果']
+
+reader = MFRC522(bus=0, device=0)
+lcd = CharLCD('PCF8574', 0x27)
+
+def log_to_csv(uid_str, name, result):
+    file_exists = os.path.exists(CSV_FILE)
+    with open(CSV_FILE, 'a', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow({
+            '日時': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'UID': uid_str,
+            '名前': name,
+            '結果': result
+        })
+
+def show_lcd(line1, line2):
+    lcd.clear()
+    lcd.write_string(f"{line1:<16}")
+    lcd.cursor_pos = (1, 0)
+    lcd.write_string(f"{line2:<16}")
+
+show_lcd("  Ready...    ", "  Scan card   ")
+print("カードをかざしてください（Ctrl+C で終了）")
+
+while True:
+    status, tag_type = reader.MFRC522_Request(reader.PICC_REQIDL)
+
+    if status == reader.MI_OK:
+        status, uid = reader.MFRC522_Anticoll()
+        if status == reader.MI_OK:
+            uid_str = "-".join([str(x) for x in uid])
+
+            if uid_str in REGISTERED:
+                name = REGISTERED[uid_str]
+                result = 'ALLOWED'
+                show_lcd("  Welcome!    ", f"   {name[:13]}")
+                print(f"[ALLOWED] {name} ({uid_str})")
+            else:
+                name = '未登録'
+                result = 'DENIED'
+                show_lcd("   ACCESS     ", "   DENIED     ")
+                print(f"[DENIED] {uid_str}")
+
+            log_to_csv(uid_str, name, result)
+            time.sleep(2)
+            show_lcd("  Ready...    ", "  Scan card   ")
+```
+
+```bash
 python3 rfid_with_csv.py
 ```
 
