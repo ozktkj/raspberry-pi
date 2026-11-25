@@ -186,6 +186,12 @@ class Log(models.Model):
 
 **Q2. `managed = False` を設定しないとどうなるか？**
 
+> `managed = True`（デフォルト）の場合、`python manage.py migrate` を実行したとき  
+> DjangoがMySQLの `logs` テーブルを**作成・変更・削除**しようとする。  
+> 作成済みのテーブルと競合してエラーになる可能性がある。  
+> `managed = False` にすることで、DjangoはSELECT/INSERT/UPDATEのみ行い  
+> テーブル構造には一切手を加えない。
+
 ### 3-2：ビューを作る
 
 ```bash
